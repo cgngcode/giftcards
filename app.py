@@ -4,6 +4,7 @@ import smtplib
 from email.mime.text import MIMEText
 import logging
 import time
+import os
 
 app = Flask(__name__)
 
@@ -11,12 +12,11 @@ app = Flask(__name__)
 # CONFIGURATION
 # =========================
 
-EZPIN_API_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzayI6IjA1ZjAxYmY2LWEzOTgtNDY3MC1iMThkLTM4ZWZiMjA5YzVjNSJ9.BUVMBubP9rcYALSLngB8psSSzg7CUxjlDuyiLfWkOCw"
-
-SMTP_SERVER = "smtp.zoho.com"
-SMTP_PORT = 587
-SMTP_USER = "giftcards@cheapgamesng.com"
-SMTP_PASS = "widt myjd fgec wfyq"
+EZPIN_API_KEY = os.environ['EZPIN_API_KEY']
+SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.zoho.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
+SMTP_USER = os.environ['SMTP_USER']
+SMTP_PASS = os.environ['SMTP_PASS']
 
 MAX_RETRIES = 3
 RETRY_DELAY = 5  # seconds
@@ -55,8 +55,7 @@ def ezpin_request_with_retry(order_name, sku, quantity):
         try:
             response = requests.post(url, json=body, headers=headers, timeout=10)
             response.raise_for_status()
-            response_data = response.json()
-            return response_data
+            return response.json()
         except Exception as e:
             logging.warning(f"Attempt {attempt} failed for SKU {sku} in order {order_name}: {e}")
             if attempt < MAX_RETRIES:
@@ -79,7 +78,6 @@ def webhook():
     order_name = data.get('name', 'UNKNOWN_ORDER')
     financial_status = data.get('financial_status', 'unknown')
 
-    # Only process paid orders
     if financial_status != 'paid':
         logging.info(f"Ignored order {order_name} - financial_status: {financial_status}")
         return jsonify({"status": "ignored", "message": "Order not paid"}), 200
@@ -87,7 +85,6 @@ def webhook():
     customer_email = data['customer']['email']
     logging.info(f"Processing paid order {order_name} for {customer_email}")
 
-    # Loop through items and process only PlayStation ones
     for item in data['line_items']:
         sku = item.get('sku')
         quantity = item.get('quantity', 1)
